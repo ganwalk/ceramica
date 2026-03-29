@@ -1,585 +1,573 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cerâmica Pro: Motor de Geometria</title>
-    
-    <!-- Tailwind CSS para estilização -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        clay: {
+                            50: '#fbf8f6',
+                            100: '#f5eee9',
+                            200: '#eadad0',
+                            300: '#d9beb0',
+                            400: '#c59b87',
+                            500: '#b68066',
+                            600: '#a86a51',
+                            700: '#8c5441',
+                            800: '#734638',
+                            900: '#5e3a30',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        /* Ajustes específicos para garantir que a impressão saia em tamanho real */
+        /* Estilos base da App */
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: #fbf8f6; }
+        
+        /* Ocultar elementos de impressão na tela normal */
+        .print-only { display: none; }
+
+        /* Estilos de Impressão (Print CSS) Cruciais */
         @media print {
             @page {
-                margin: 1cm; /* Remove as margens padrão do navegador e adiciona margem de segurança de 1cm */
+                margin: 1cm; /* Margem de segurança */
             }
             body {
+                margin: 0;
+                padding: 0;
+                background-color: white !important;
                 -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
             }
-            /* Esconde tudo que não tem a classe 'print:block' */
-            .print\:hidden { display: none !important; }
-            .print\:block { display: block !important; }
-            
-            /* GARANTIA DE ESCALA E PAGINAÇÃO: 
-               Impede encolhimento e garante que o elemento seja fatiado em várias páginas */
-            #print-container svg {
+            /* Esconder UI */
+            .no-print { display: none !important; }
+            /* Mostrar apenas área de impressão */
+            .print-only { display: block !important; }
+
+            /* Forçar tamanho real 1:1 no SVG */
+            #print-area svg {
                 max-width: none !important;
                 max-height: none !important;
+                width: var(--print-width) !important;
+                height: var(--print-height) !important;
                 overflow: visible !important;
-                display: block; 
+                display: block;
+                page-break-inside: avoid;
             }
         }
     </style>
 </head>
-<body class="bg-stone-100 font-sans text-stone-800 m-0 p-0">
+<body class="text-gray-800 h-screen overflow-hidden flex flex-col md:flex-row">
 
-    <!-- ========================================== -->
-    <!-- TELA PRINCIPAL (NÃO IMPRIME)               -->
-    <!-- ========================================== -->
-    <div id="app-screen" class="print:hidden p-4 md:p-8 max-w-7xl mx-auto">
-        
-        <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-stone-300 pb-6">
-            <div>
-                <h1 class="text-3xl font-bold text-orange-900">Cerâmica Pro: Motor de Geometria</h1>
-                <p class="text-stone-600 mt-1">Gere planificações exatas para vasos côncavos, convexos e retos.</p>
-            </div>
-            <button 
-                onclick="window.print()"
-                class="flex items-center gap-2 bg-orange-700 hover:bg-orange-800 text-white px-6 py-3 rounded-lg font-bold shadow-md transition-all cursor-pointer"
-            >
-                <i data-lucide="printer" class="w-5 h-5"></i>
-                Imprimir em 100% (Tamanho Real)
-            </button>
-        </header>
+    <!-- SIDEBAR (Painel de Controlo) - Oculto na impressão -->
+    <aside class="w-full md:w-80 bg-white border-r border-clay-200 flex flex-col h-full no-print shadow-lg z-10">
+        <div class="p-6 border-b border-clay-100 bg-clay-50">
+            <h1 class="text-2xl font-bold text-clay-800 flex items-center gap-2">
+                <i class="ph ph-intersect text-3xl text-clay-600"></i>
+                Cerâmica Pro
+            </h1>
+            <p class="text-sm text-clay-600 mt-1">Motor de Geometria de Placas</p>
+        </div>
 
-        <div class="flex flex-col lg:flex-row gap-6">
-            
-            <!-- PAINEL ESQUERDO: CONTROLES -->
-            <div class="w-full lg:w-1/3 space-y-4">
-                
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
-                    <h2 class="text-lg font-bold text-stone-800 mb-3 border-b pb-2">1. Escolha a Geometria</h2>
-                    <div id="shape-selector" class="grid grid-cols-1 gap-2 max-h-[40vh] overflow-y-auto pr-2">
-                        <!-- Botões gerados via JS -->
-                    </div>
+        <div class="p-6 flex-1 overflow-y-auto">
+            <!-- Seleção de Forma -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Forma Desejada</label>
+                <div class="space-y-2" id="shape-selector">
+                    <!-- Gerado via JS -->
                 </div>
-
-                <!-- Toggle de Alça -->
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-stone-200">
-                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleHandle()">
-                        <h2 class="text-lg font-bold text-stone-800">Adicionar Alça?</h2>
-                        <div class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="handle-toggle" class="sr-only peer">
-                            <div class="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                        </div>
-                    </div>
-                    <div id="handle-params" class="hidden mt-4 space-y-5 pt-4 border-t border-stone-100">
-                        <!-- Sliders da alça injetados via JS -->
-                    </div>
-                </div>
-
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-stone-200">
-                    <h2 class="text-lg font-bold text-stone-800 mb-4 border-b pb-2">2. Parâmetros da Peça (cm)</h2>
-                    <div id="params-container" class="space-y-5">
-                        <!-- Sliders gerados via JS -->
-                    </div>
-                </div>
-
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 flex gap-3 text-blue-800 text-sm">
-                    <i data-lucide="file-text" class="w-6 h-6 flex-shrink-0"></i>
-                    <div>
-                        <p class="font-bold">Recomendação de Impressão:</p>
-                        <p id="paper-recommendation" class="mt-1 text-blue-900 font-medium">Calculando...</p>
-                    </div>
-                </div>
-
             </div>
 
-            <!-- PAINEL DIREITO: VISUALIZADOR -->
-            <div class="w-full lg:w-2/3 bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col">
-                <h2 class="text-xl font-bold text-stone-800 mb-4 w-full border-b pb-2 flex justify-between items-center">
-                    <span>Preview do Molde</span>
-                    <span class="text-xs font-normal text-stone-500 bg-stone-100 px-2 py-1 rounded-full flex items-center gap-1">
-                        <i data-lucide="info" class="w-3 h-3"></i> Apenas visualização. O tamanho real é gerado na impressão.
-                    </span>
+            <!-- Parâmetros Dinâmicos -->
+            <div class="mb-6 border-t border-clay-100 pt-6">
+                <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                    <i class="ph ph-sliders-horizontal text-lg"></i>
+                    Ajustes (cm)
                 </h2>
-                <div id="preview-container" class="w-full flex-grow flex items-center justify-center p-4 bg-[#fcfaf8] border-2 border-dashed border-stone-300 rounded-xl relative overflow-hidden min-h-[500px]">
-                   <!-- SVG Injetado via JS -->
+                <div id="parameters-container" class="space-y-5">
+                    <!-- Sliders gerados via JS -->
                 </div>
             </div>
-
         </div>
-    </div>
 
-    <!-- ========================================== -->
-    <!-- ÁREA DE IMPRESSÃO ESCALA 1:1               -->
-    <!-- ========================================== -->
-    
-    <!-- Removido o absolute daqui para permitir a criação livre de múltiplas páginas! -->
-    <div id="print-screen" class="hidden print:block w-full bg-white text-black relative">
+        <div class="p-6 bg-clay-50 border-t border-clay-200">
+            <button onclick="window.print()" class="w-full bg-clay-700 hover:bg-clay-800 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition duration-200">
+                <i class="ph ph-printer text-xl"></i>
+                Imprimir Molde (1:1)
+            </button>
+            <p class="text-xs text-center text-clay-500 mt-2">Requer impressora configurada para escala 100%.</p>
+        </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL (Preview) - Oculta na impressão -->
+    <main class="flex-1 flex flex-col h-full relative no-print bg-clay-100/50">
         
-        <!-- O cabeçalho fica absoluto no topo para não empurrar o SVG, 
-             garantindo que o SVG comece sempre na página 1 -->
-        <div class="absolute top-0 left-0 w-full h-[4.5cm] bg-white z-10">
-            <div class="mb-2 pb-2 border-b-2 border-black flex justify-between items-end">
+        <!-- Header Recomendação Papel -->
+        <div class="p-4 bg-white shadow-sm flex items-center justify-between border-b border-clay-200">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-100 text-blue-700 p-2 rounded-full">
+                    <i class="ph ph-scroll text-xl"></i>
+                </div>
                 <div>
-                    <h1 id="print-title" class="text-2xl font-bold">Molde 1:1</h1>
-                    <p class="text-sm">Desenho técnico para corte em placa de argila.</p>
-                    <p id="print-paper-rec" class="text-sm font-bold mt-1 bg-black text-white inline-block px-2 py-1 rounded">Recomendado: A4</p>
-                </div>
-                <div class="text-right text-xs">
-                    <p class="text-red-600 font-bold uppercase text-sm mb-1">Muito Importante:</p>
-                    <p>Na tela de impressão, defina <strong>Escala: 100%</strong> ou <strong>Tamanho Real</strong>.</p>
-                    <p><strong>NÃO</strong> use "Ajustar à página" ou "Fit to Page".</p>
+                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Tamanho Total</p>
+                    <p class="font-bold" id="total-dimensions">0.0 cm x 0.0 cm</p>
                 </div>
             </div>
-
-            <!-- Régua de Segurança de 5cm -->
-            <div class="flex flex-col gap-1">
-                <div style="width: 5cm; height: 10px; border: 1px solid black; border-bottom: none; position: relative;">
-                    <div style="position: absolute; top: 10px; left: 0; width: 1cm; height: 5px; border-right: 1px solid black;"></div>
-                    <div style="position: absolute; top: 10px; left: 1cm; width: 1cm; height: 5px; border-right: 1px solid black;"></div>
-                    <div style="position: absolute; top: 10px; left: 2cm; width: 1cm; height: 5px; border-right: 1px solid black;"></div>
-                    <div style="position: absolute; top: 10px; left: 3cm; width: 1cm; height: 5px; border-right: 1px solid black;"></div>
-                </div>
-                <p class="text-[10px] font-mono m-0">0 | 1 | 2 | 3 | 4 | 5cm</p>
+            <div class="text-right">
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Recomendação de Papel</p>
+                <p class="font-bold text-emerald-600" id="paper-recommendation">A4</p>
             </div>
         </div>
 
-        <!-- Molde Real Impresso (pt-[5cm] cria espaço para o cabeçalho acima dele na Página 1) -->
-        <div id="print-container" class="w-full pt-[5cm]">
-           <!-- SVG Injetado via JS -->
+        <!-- Área do Canvas SVG (Preview Responsivo) -->
+        <div class="flex-1 p-8 overflow-hidden flex items-center justify-center relative">
+            <!-- Grid de fundo visual -->
+            <div class="absolute inset-0 pointer-events-none opacity-20" style="background-size: 20px 20px; background-image: linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px);"></div>
+            
+            <div class="bg-white shadow-md border border-gray-200 rounded-sm p-4 w-full h-full max-w-4xl max-h-full flex items-center justify-center relative z-0">
+                <div id="preview-svg-container" class="w-full h-full flex items-center justify-center">
+                    <!-- SVG será injetado aqui. Adaptável à div. -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ÁREA DE IMPRESSÃO (Print Engine) -->
+    <div id="print-area" class="print-only">
+        <!-- Aviso de Calibração -->
+        <div style="border: 2px solid black; padding: 10px; margin-bottom: 20px; font-family: sans-serif;">
+            <h2 style="margin: 0 0 5px 0; font-size: 16pt;">⚠️ ATENÇÃO - CALIBRAÇÃO DE IMPRESSÃO</h2>
+            <p style="margin: 0; font-size: 12pt;">Defina a Escala da impressora para <strong>100%</strong> ou <strong>Tamanho Real</strong>. NÃO use "Ajustar à Página".</p>
         </div>
 
+        <!-- Régua Física de Validação -->
+        <div style="margin-bottom: 20px; font-family: sans-serif;">
+            <p style="margin: 0 0 5px 0; font-size: 10pt;">Verifique se a caixa abaixo mede exatamente 5cm na folha impressa:</p>
+            <div style="width: 5cm; height: 1cm; border: 1px solid black; position: relative; box-sizing: border-box;">
+                <div style="position: absolute; left: 1cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                <div style="position: absolute; left: 2cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                <div style="position: absolute; left: 3cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                <div style="position: absolute; left: 4cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                <span style="position: absolute; right: 2px; bottom: 2px; font-size: 8pt;">5cm</span>
+            </div>
+        </div>
+
+        <!-- Molde SVG Físico -->
+        <div id="print-svg-container">
+            <!-- SVG com tamanhos físicos será injetado aqui -->
+        </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- LÓGICA DO APLICATIVO (JAVASCRIPT)          -->
-    <!-- ========================================== -->
+    <!-- CÓDIGO DO MOTOR JAVASCRIPT -->
     <script>
-        let activeShape = 'cilindro';
-        const params = {
-            cilindro: { d: 10, h: 12 },
-            caixa: { w: 10, l: 10, h: 8 },
-            cone: { dTop: 12, dBot: 8, h: 15 },
-            tigela: { d: 25, darts: 6, dartDepth: 4, dartWidth: 3 },
-            ondulado: { d: 10, hMin: 10, hMax: 14, waves: 3 }
+        // --- 1. CONFIGURAÇÕES DAS FORMAS ---
+        const shapes = {
+            cylinder: {
+                id: 'cylinder',
+                name: 'Cilindro (Copo/Xícara)',
+                icon: 'ph-cylinder',
+                params: {
+                    d: { label: 'Diâmetro', min: 4, max: 30, val: 8, step: 0.5 },
+                    h: { label: 'Altura', min: 4, max: 40, val: 10, step: 0.5 }
+                },
+                generator: getCylinderSVG
+            },
+            box: {
+                id: 'box',
+                name: 'Caixa Quadrada/Retangular',
+                icon: 'ph-cube',
+                params: {
+                    w: { label: 'Largura', min: 4, max: 40, val: 10, step: 0.5 },
+                    l: { label: 'Profundidade', min: 4, max: 40, val: 10, step: 0.5 },
+                    h: { label: 'Altura', min: 2, max: 30, val: 5, step: 0.5 }
+                },
+                generator: getBoxSVG
+            },
+            cone: {
+                id: 'cone',
+                name: 'Vaso Cônico (Curvo)',
+                icon: 'ph-martini',
+                params: {
+                    dTop: { label: 'Diâmetro Topo', min: 2, max: 30, val: 12, step: 0.5 },
+                    dBot: { label: 'Diâmetro Base', min: 2, max: 30, val: 6, step: 0.5 },
+                    h: { label: 'Altura', min: 5, max: 40, val: 15, step: 0.5 }
+                },
+                generator: getConeSVG
+            },
+            bowl: {
+                id: 'bowl',
+                name: 'Tigela Bojuda (Pences)',
+                icon: 'ph-cooking-pot',
+                params: {
+                    d: { label: 'Diâmetro do Disco', min: 10, max: 50, val: 25, step: 0.5 },
+                    darts: { label: 'Qtd. de Pences (Cortes)', min: 3, max: 12, val: 6, step: 1 },
+                    depth: { label: 'Profundidade do Corte', min: 1, max: 15, val: 5, step: 0.5 },
+                    dartWidth: { label: 'Abertura do Corte (Borda)', min: 1, max: 10, val: 4, step: 0.1 }
+                },
+                generator: getDartBowlSVG
+            },
+            organic: {
+                id: 'organic',
+                name: 'Vaso Orgânico (Ondas)',
+                icon: 'ph-wave-sine',
+                params: {
+                    d: { label: 'Diâmetro Base', min: 4, max: 30, val: 10, step: 0.5 },
+                    hMax: { label: 'Altura Máxima', min: 10, max: 40, val: 20, step: 0.5 },
+                    hMin: { label: 'Altura Mínima', min: 2, max: 30, val: 12, step: 0.5 },
+                    waves: { label: 'Nº de Ondas', min: 1, max: 12, val: 3, step: 1 }
+                },
+                generator: getOrganicSVG
+            }
         };
 
-        const globalParams = {
-            showHandle: false,
-            aw: 2.5,
-            al: 14  
-        };
+        let currentShape = 'cylinder';
 
-        function getPaperRecommendation(w, h) {
-            const maxDim = Math.max(w, h);
-            const minDim = Math.min(w, h);
-            
-            if (minDim <= 19 && maxDim <= 27.7) return "1 Folha A4 (Retrato ou Paisagem)";
-            if (minDim <= 27.7 && maxDim <= 40) return "1 Folha A3 (ou 2 Folhas A4 coladas)";
-            if (minDim <= 19 && maxDim <= 55.4) return "2 Folhas A4 (Unidas pelo lado menor)";
-            if (minDim <= 38 && maxDim <= 27.7) return "2 Folhas A4 (Unidas pelo lado maior)";
-            if (minDim <= 27.7 && maxDim <= 80) return "2 Folhas A3 (Unidas)";
-            
-            return "Impressão Grande (Múltiplas Folhas - Fatiado pelo navegador)";
-        }
+        // --- 2. MOTORES MATEMÁTICOS DE GEOMETRIA SVG ---
+        // CRÍTICO: Todas as tags <g> retornadas usam stroke-linejoin="round" e stroke-linecap="round"
 
-        function appendHandle(p, baseW, baseH, isPrint) {
-            if (!p.showHandle) return { svg: '', w: baseW, h: baseH };
+        function getCylinderSVG(p) {
+            const w = p.d * Math.PI;
+            const r = p.d / 2;
+            const totalW = Math.max(w, p.d);
+            const totalH = p.h + p.d + 1; // 1cm de espaçamento
             
-            const textFill = isPrint ? "black" : "#7c2d12";
-            const gap = 1;
-            const handleX = baseW + gap;
-            
+            const rectX = (totalW - w) / 2;
+            const cx = totalW / 2;
+            const cyCirc = p.h + 1 + r;
+
             const svg = `
-                <rect x="${handleX}" y="0" width="${p.aw}" height="${p.al}" stroke-dasharray="none" />
-                <g transform="translate(${handleX + p.aw/2}, ${p.al/2}) rotate(90)">
-                    <text x="0" y="0" font-size="${isPrint ? '0.4' : '0.8'}" stroke="none" fill="${textFill}" text-anchor="middle" dominant-baseline="middle">Alça (${p.aw}x${p.al})</text>
+                <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
+                    <rect x="${rectX}" y="0" width="${w}" height="${p.h}" />
+                    <circle cx="${cx}" cy="${cyCirc}" r="${r}" />
                 </g>
             `;
-            
-            return {
-                svg: svg,
-                w: baseW + gap + p.aw,
-                h: Math.max(baseH, p.al)
-            };
+            return { svg, w: totalW, h: totalH };
         }
 
-        function renderCilindro(p, isPrint = false) {
-            const width = Math.PI * p.d;
-            let totalW = Math.max(width, p.d);
-            let totalH = p.h + 1 + p.d;
-            
-            const handle = appendHandle(p, totalW, totalH, isPrint);
-            totalW = handle.w;
-            totalH = handle.h;
-            
-            const strokeClass = isPrint ? "stroke-black fill-none" : "stroke-orange-900 fill-[#fff7ed]";
-            const strokeW = isPrint ? "0.05" : "0.2";
-            const textFill = isPrint ? "black" : "#7c2d12";
-            const preventScale = isPrint ? `style="max-width: none !important; width: ${totalW}cm !important; height: ${totalH}cm !important;"` : "";
+        function getBoxSVG(p) {
+            const totalW = p.w + 2 * p.h;
+            const totalH = p.l + 2 * p.h;
 
-            const html = `
-            <svg viewBox="0 0 ${totalW} ${totalH}" width="${isPrint ? totalW + 'cm' : '100%'}" height="${isPrint ? totalH + 'cm' : '100%'}" class="${strokeClass}" ${preventScale}>
-                <g stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round">
-                    <rect x="0" y="0" width="${width}" height="${p.h}" />
-                    <circle cx="${p.d/2}" cy="${p.h + 1 + p.d/2}" r="${p.d/2}" />
-                    <text x="${width/2}" y="${p.h/2}" font-size="${isPrint ? '0.5' : '1'}" stroke="none" fill="${textFill}" text-anchor="middle" dominant-baseline="middle">Corpo (${width.toFixed(1)} cm)</text>
-                    ${handle.svg}
+            const svg = `
+                <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
+                    <!-- Contorno Externo -->
+                    <path d="M ${p.h} 0 L ${p.h+p.w} 0 L ${p.h+p.w} ${p.h} L ${totalW} ${p.h} L ${totalW} ${p.h+p.l} L ${p.h+p.w} ${p.h+p.l} L ${p.h+p.w} ${totalH} L ${p.h} ${totalH} L ${p.h} ${p.h+p.l} L 0 ${p.h+p.l} L 0 ${p.h} L ${p.h} ${p.h} Z" />
+                    <!-- Linhas de Dobra (Tracejadas) -->
+                    <line x1="${p.h}" y1="${p.h}" x2="${p.h+p.w}" y2="${p.h}" stroke-dasharray="0.3, 0.3" />
+                    <line x1="${p.h}" y1="${p.h+p.l}" x2="${p.h+p.w}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
+                    <line x1="${p.h}" y1="${p.h}" x2="${p.h}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
+                    <line x1="${p.h+p.w}" y1="${p.h}" x2="${p.h+p.w}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
                 </g>
-            </svg>`;
-            return { html, w: totalW, h: totalH };
+            `;
+            return { svg, w: totalW, h: totalH };
         }
 
-        function renderCaixa(p, isPrint = false) {
-            let totalW = p.h + p.w + p.h;
-            let totalH = p.h + p.l + p.h;
-            
-            const handle = appendHandle(p, totalW, totalH, isPrint);
-            totalW = handle.w;
-            totalH = handle.h;
-            
-            const strokeClass = isPrint ? "stroke-black fill-none" : "stroke-orange-900 fill-[#fff7ed]";
-            const strokeW = isPrint ? "0.05" : "0.2";
-            const dashColor = isPrint ? "black" : "#c2410c";
-            const dashArray = isPrint ? "0.2" : "0.5";
-            const preventScale = isPrint ? `style="max-width: none !important; width: ${totalW}cm !important; height: ${totalH}cm !important;"` : "";
+        function getConeSVG(p) {
+            // Fallback para cilindro se a diferença for muito pequena
+            if (Math.abs(p.dTop - p.dBot) < 0.1) return getCylinderSVG({d: (p.dTop+p.dBot)/2, h: p.h});
 
-            const html = `
-            <svg viewBox="0 0 ${totalW} ${totalH}" width="${isPrint ? totalW + 'cm' : '100%'}" height="${isPrint ? totalH + 'cm' : '100%'}" class="${strokeClass}" ${preventScale}>
-                <g stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round">
-                    <rect x="${p.h}" y="${p.h}" width="${p.w}" height="${p.l}" />
-                    <rect x="${p.h}" y="0" width="${p.w}" height="${p.h}" />
-                    <rect x="${p.h}" y="${p.h + p.l}" width="${p.w}" height="${p.h}" />
-                    <rect x="0" y="${p.h}" width="${p.h}" height="${p.l}" />
-                    <rect x="${p.h + p.w}" y="${p.h}" width="${p.h}" height="${p.l}" />
-                    
-                    <line x1="${p.h}" y1="${p.h}" x2="${p.h + p.w}" y2="${p.h}" stroke-dasharray="${dashArray}" stroke="${dashColor}" />
-                    <line x1="${p.h}" y1="${p.h + p.l}" x2="${p.h + p.w}" y2="${p.h + p.l}" stroke-dasharray="${dashArray}" stroke="${dashColor}" />
-                    <line x1="${p.h}" y1="${p.h}" x2="${p.h}" y2="${p.h + p.l}" stroke-dasharray="${dashArray}" stroke="${dashColor}" />
-                    <line x1="${p.h + p.w}" y1="${p.h}" x2="${p.h + p.w}" y2="${p.h + p.l}" stroke-dasharray="${dashArray}" stroke="${dashColor}" />
-                    ${handle.svg}
+            let rTop = p.dTop / 2;
+            let rBot = p.dBot / 2;
+            let invert = false;
+            if (rTop > rBot) {
+                [rTop, rBot] = [rBot, rTop];
+                invert = true;
+            }
+
+            // Teorema de Pitágoras para Hipotenusa (lateral)
+            const s = Math.sqrt(Math.pow(rBot - rTop, 2) + Math.pow(p.h, 2));
+            const R_top = s * rTop / (rBot - rTop);
+            const R_bot = R_top + s;
+            const theta = (rBot * 2 * Math.PI) / R_bot; // Radianos
+
+            const startAngle = Math.PI / 2 - theta / 2;
+            const endAngle = Math.PI / 2 + theta / 2;
+
+            function p2c(cx, cy, r, angle) { return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }; }
+
+            // Calcular Bounding Box
+            const pt1 = p2c(0, 0, R_bot, startAngle);
+            const pt2 = p2c(0, 0, R_bot, endAngle);
+            const pt3 = p2c(0, 0, R_top, startAngle);
+            const pt4 = p2c(0, 0, R_top, endAngle);
+            const pApex = { x: 0, y: R_bot };
+
+            const xs = [pt1.x, pt2.x, pt3.x, pt4.x];
+            const ys = [pt1.y, pt2.y, pt3.y, pt4.y];
+            if (theta > 0) ys.push(pApex.y);
+
+            const minX = Math.min(...xs); const maxX = Math.max(...xs);
+            const minY = Math.min(...ys); const maxY = Math.max(...ys);
+
+            const frustumW = maxX - minX;
+            const frustumH = maxY - minY;
+
+            // Offset para o SVG (transformar coordenadas para positivas)
+            const cx = -minX;
+            const cy = -minY;
+
+            const tStart = p2c(cx, cy, R_top, startAngle);
+            const tEnd = p2c(cx, cy, R_top, endAngle);
+            const bStart = p2c(cx, cy, R_bot, startAngle);
+            const bEnd = p2c(cx, cy, R_bot, endAngle);
+
+            const largeArc = theta > Math.PI ? "1" : "0";
+
+            let pathD = `M ${tStart.x} ${tStart.y} `;
+            pathD += `A ${R_top} ${R_top} 0 ${largeArc} 1 ${tEnd.x} ${tEnd.y} `;
+            pathD += `L ${bEnd.x} ${bEnd.y} `;
+            pathD += `A ${R_bot} ${R_bot} 0 ${largeArc} 0 ${bStart.x} ${bStart.y} Z`;
+
+            // Base física associada
+            const baseR = invert ? rTop : rBot; 
+            const totalW = Math.max(frustumW, baseR * 2);
+            const totalH = frustumH + 1 + baseR * 2;
+            const baseCx = totalW / 2;
+            const baseCy = frustumH + 1 + baseR;
+            
+            // Centralizar frustum se necessário
+            const offsetX = (totalW - frustumW) / 2;
+
+            const svg = `
+                <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
+                    <g transform="translate(${offsetX}, 0)">
+                        <path d="${pathD}" />
+                    </g>
+                    <circle cx="${baseCx}" cy="${baseCy}" r="${baseR}" />
                 </g>
-            </svg>`;
-            return { html, w: totalW, h: totalH };
+            `;
+            return { svg, w: totalW, h: totalH };
         }
 
-        function renderCone(p, isPrint = false) {
-            if (Math.abs(p.dTop - p.dBot) < 0.1) return renderCilindro({d: p.dTop, h: p.h, showHandle: p.showHandle, aw: p.aw, al: p.al}, isPrint);
+        function getDartBowlSVG(p) {
+            const R = p.d / 2;
+            const cx = R;
+            const cy = R;
             
-            const rTop = p.dTop / 2;
-            const rBot = p.dBot / 2;
-            const h = p.h;
-            
-            const rMax = Math.max(rTop, rBot);
-            const rMin = Math.min(rTop, rBot);
-            
-            const slant = Math.sqrt(Math.pow(rMax - rMin, 2) + Math.pow(h, 2));
-            const R1 = slant * rMax / (rMax - rMin); 
-            const R2 = R1 - slant;                   
-            const theta = (2 * Math.PI * rMax) / R1;
-            
-            const getPoint = (radius, angle) => ({
-                x: R1 + radius * Math.sin(angle),
-                y: R1 - radius * Math.cos(angle)
-            });
+            // Prevenção de quebra geométrica
+            const depth = Math.min(p.depth, R - 0.5); 
+            const innerR = R - depth;
 
-            const startOuter = getPoint(R1, -theta/2);
-            const endOuter = getPoint(R1, theta/2);
-            const startInner = getPoint(R2, -theta/2);
-            const endInner = getPoint(R2, theta/2);
-            
-            const largeArc = theta > Math.PI ? 1 : 0;
-            
-            const pathData = `M ${startOuter.x} ${startOuter.y} 
-                              A ${R1} ${R1} 0 ${largeArc} 1 ${endOuter.x} ${endOuter.y} 
-                              L ${endInner.x} ${endInner.y} 
-                              A ${R2} ${R2} 0 ${largeArc} 0 ${startInner.x} ${startInner.y} Z`;
+            let pathD = "";
+            for (let i = 0; i < p.darts; i++) {
+                const angle = (i * 2 * Math.PI) / p.darts;
+                // Prevenir que o dart seja mais largo que a circunferência disponível
+                const maxDartW = (R * 2 * Math.PI) / p.darts - 0.1;
+                const safeDartW = Math.min(p.dartWidth, maxDartW);
+                const delta = (safeDartW / 2) / R; 
 
-            let totalW = R1 * 2;
-            let totalH = R1 + rBot * 2 + 2;
+                const a1 = angle - delta;
+                const a2 = angle + delta;
 
-            const handle = appendHandle(p, totalW, totalH, isPrint);
-            totalW = handle.w;
-            totalH = handle.h;
+                const pInner = { x: cx + innerR * Math.cos(angle), y: cy + innerR * Math.sin(angle) };
+                const pEdge1 = { x: cx + R * Math.cos(a1), y: cy + R * Math.sin(a1) };
+                const pEdge2 = { x: cx + R * Math.cos(a2), y: cy + R * Math.sin(a2) };
 
-            const strokeClass = isPrint ? "stroke-black fill-none" : "stroke-orange-900 fill-[#fff7ed]";
-            const strokeW = isPrint ? "0.05" : "0.2";
-            const textFill = isPrint ? "black" : "#7c2d12";
-            const preventScale = isPrint ? `style="max-width: none !important; width: ${totalW}cm !important; height: ${totalH}cm !important;"` : "";
-
-            const html = `
-            <svg viewBox="0 0 ${totalW} ${totalH}" width="${isPrint ? totalW + 'cm' : '100%'}" height="${isPrint ? totalH + 'cm' : '100%'}" class="${strokeClass}" ${preventScale}>
-                <g stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round">
-                    <path d="${pathData}" />
-                    <circle cx="${R1}" cy="${R1 + rBot + 1}" r="${rBot}" />
-                    <circle cx="${R1}" cy="${R1 + rBot*2 + rTop + 2}" r="${rTop}" stroke-dasharray="0.5" />
-                    <text x="${R1}" y="${R1 - R2 - (R1-R2)/2}" font-size="${isPrint ? '0.5' : '1'}" stroke="none" fill="${textFill}" text-anchor="middle" dominant-baseline="middle">Parede Curva</text>
-                    ${handle.svg}
-                </g>
-            </svg>`;
-            return { html, w: totalW, h: totalH };
-        }
-
-        function renderTigela(p, isPrint = false) {
-            const r = p.d / 2;
-            const cx = r;
-            const cy = r;
-            const n = Math.floor(p.darts);
-            const angleStep = (2 * Math.PI) / n;
-            const dartAngle = p.dartWidth / r; 
-            
-            let pathData = "";
-            
-            for (let i = 0; i < n; i++) {
-                const midAngle = i * angleStep;
-                const startAngle = midAngle - (dartAngle / 2);
-                const endAngle = midAngle + (dartAngle / 2);
-                
-                const p1 = { x: cx + r * Math.cos(startAngle), y: cy + r * Math.sin(startAngle) };
-                const pTip = { x: cx + (r - p.dartDepth) * Math.cos(midAngle), y: cy + (r - p.dartDepth) * Math.sin(midAngle) };
-                const p2 = { x: cx + r * Math.cos(endAngle), y: cy + r * Math.sin(endAngle) };
-                
                 if (i === 0) {
-                    pathData += `M ${p1.x} ${p1.y} `;
+                    pathD += `M ${pEdge2.x} ${pEdge2.y} `;
                 } else {
-                    pathData += `A ${r} ${r} 0 0 1 ${p1.x} ${p1.y} `;
+                    pathD += `A ${R} ${R} 0 0 1 ${pEdge1.x} ${pEdge1.y} `;
+                    pathD += `L ${pInner.x} ${pInner.y} L ${pEdge2.x} ${pEdge2.y} `;
                 }
-                pathData += `L ${pTip.x} ${pTip.y} L ${p2.x} ${p2.y} `;
+
+                if (i === p.darts - 1) {
+                    const firstA = 0 - delta;
+                    const pFirst1 = { x: cx + R * Math.cos(firstA), y: cy + R * Math.sin(firstA) };
+                    pathD += `A ${R} ${R} 0 0 1 ${pFirst1.x} ${pFirst1.y} `;
+                    const pFirstInner = { x: cx + innerR * Math.cos(0), y: cy + innerR * Math.sin(0) };
+                    pathD += `L ${pFirstInner.x} ${pFirstInner.y} Z`;
+                }
             }
-            
-            const firstStartAngle = 0 - (dartAngle / 2);
-            const pFirst = { x: cx + r * Math.cos(firstStartAngle), y: cy + r * Math.sin(firstStartAngle) };
-            pathData += `A ${r} ${r} 0 0 1 ${pFirst.x} ${pFirst.y} Z`;
 
-            let totalW = p.d;
-            let totalH = p.d;
-
-            const handle = appendHandle(p, totalW, totalH, isPrint);
-            totalW = handle.w;
-            totalH = handle.h;
-            
-            const strokeClass = isPrint ? "stroke-black fill-none" : "stroke-orange-900 fill-[#fff7ed]";
-            const strokeW = isPrint ? "0.05" : "0.2";
-            const textFill = isPrint ? "black" : "#7c2d12";
-            const dashColor = isPrint ? "black" : "#c2410c";
-            const preventScale = isPrint ? `style="max-width: none !important; width: ${totalW}cm !important; height: ${totalH}cm !important;"` : "";
-
-            const html = `
-            <svg viewBox="0 0 ${totalW} ${totalH}" width="${isPrint ? totalW + 'cm' : '100%'}" height="${isPrint ? totalH + 'cm' : '100%'}" class="${strokeClass}" ${preventScale}>
-                <g stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round">
-                    <path d="${pathData}" />
-                    <circle cx="${cx}" cy="${cy}" r="${r - p.dartDepth}" stroke-dasharray="${isPrint ? '0.2' : '0.5'}" stroke="${dashColor}" fill="none" />
-                    <text x="${cx}" y="${cy}" font-size="${isPrint ? '0.5' : '1'}" stroke="none" fill="${textFill}" text-anchor="middle" dominant-baseline="middle">Fundo Plano</text>
-                    ${handle.svg}
+            const svg = `
+                <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
+                    <path d="${pathD}" />
+                    <circle cx="${cx}" cy="${cy}" r="${innerR}" stroke-dasharray="0.3,0.3" />
                 </g>
-            </svg>`;
-            return { html, w: totalW, h: totalH };
+            `;
+            return { svg, w: p.d, h: p.d };
         }
 
-        function renderOndulado(p, isPrint = false) {
-            const width = Math.PI * p.d;
-            const segments = 100;
-            
-            let pathData = `M 0 ${p.hMax} L ${width} ${p.hMax} L ${width} ${p.hMax - p.hMin} `;
-            
-            for (let i = 1; i <= segments; i++) {
-                const x = width - (i / segments) * width; 
-                const h_x = p.hMin + ((p.hMax - p.hMin) / 2) * (1 - Math.cos((x / width) * 2 * Math.PI * p.waves));
-                const y = p.hMax - h_x;
-                pathData += `L ${x} ${y} `;
+        function getOrganicSVG(p) {
+            const w = p.d * Math.PI;
+            const r = p.d / 2;
+            const totalW = Math.max(w, p.d);
+            const totalH = p.hMax + r * 2 + 1;
+
+            const offsetX = (totalW - w) / 2;
+            const segments = 200; // Alta resolução para a curva ser suave
+            let pathD = `M ${offsetX} ${p.hMax} L ${offsetX + w} ${p.hMax} `;
+
+            // Garantir que hMin não exceda hMax
+            const minHeight = Math.min(p.hMin, p.hMax);
+            const amplitude = (p.hMax - minHeight) / 2;
+
+            for (let i = 0; i <= segments; i++) {
+                const x = w - (i / segments) * w;
+                // Cosseno para criar as ondas no topo
+                const waveY = amplitude * (1 - Math.cos(p.waves * 2 * Math.PI * (w - x) / w));
+                const y = p.hMax - minHeight - waveY;
+                pathD += `L ${x + offsetX} ${y} `;
             }
-            pathData += `L 0 ${p.hMax} Z`;
+            pathD += `Z`;
 
-            let totalW = Math.max(width, p.d);
-            let totalH = p.hMax + 1 + p.d;
+            const cx = totalW / 2;
+            const cy = p.hMax + 1 + r;
 
-            const handle = appendHandle(p, totalW, totalH, isPrint);
-            totalW = handle.w;
-            totalH = handle.h;
-
-            const strokeClass = isPrint ? "stroke-black fill-none" : "stroke-orange-900 fill-[#fff7ed]";
-            const strokeW = isPrint ? "0.05" : "0.2";
-            const textFill = isPrint ? "black" : "#7c2d12";
-            const preventScale = isPrint ? `style="max-width: none !important; width: ${totalW}cm !important; height: ${totalH}cm !important;"` : "";
-
-            const html = `
-            <svg viewBox="0 0 ${totalW} ${totalH}" width="${isPrint ? totalW + 'cm' : '100%'}" height="${isPrint ? totalH + 'cm' : '100%'}" class="${strokeClass}" ${preventScale}>
-                <g stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round">
-                    <path d="${pathData}" />
-                    <circle cx="${p.d/2}" cy="${p.hMax + 1 + p.d/2}" r="${p.d/2}" />
-                    <text x="${width/2}" y="${p.hMax - p.hMin/2}" font-size="${isPrint ? '0.5' : '1'}" stroke="none" fill="${textFill}" text-anchor="middle" dominant-baseline="middle">Corpo Orgânico</text>
-                    ${handle.svg}
+            const svg = `
+                <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
+                    <path d="${pathD}" />
+                    <circle cx="${cx}" cy="${cy}" r="${r}" />
                 </g>
-            </svg>`;
-            return { html, w: totalW, h: totalH };
+            `;
+            return { svg, w: totalW, h: totalH };
         }
 
-        const shapes = [
-            { id: 'cilindro', name: 'Cilindro (Copo/Xícara)', icon: 'cylinder', render: renderCilindro, params: [
-                { key: 'd', label: 'Diâmetro', min: 4, max: 30 },
-                { key: 'h', label: 'Altura', min: 4, max: 50 }
-            ]},
-            { id: 'cone', name: 'Vaso Cônico (Curvo)', icon: 'triangle', render: renderCone, params: [
-                { key: 'dTop', label: 'Diâmetro da Boca', min: 2, max: 40 },
-                { key: 'dBot', label: 'Diâmetro da Base', min: 2, max: 40 },
-                { key: 'h', label: 'Altura da Peça', min: 4, max: 40 }
-            ]},
-            { id: 'tigela', name: 'Tigela Bojuda (Pences)', icon: 'orbit', render: renderTigela, params: [
-                { key: 'd', label: 'Diâmetro do Disco Placa', min: 10, max: 50 },
-                { key: 'darts', label: 'Quantidade de Cortes', min: 3, max: 12 },
-                { key: 'dartDepth', label: 'Profund. do Corte (cm)', min: 1, max: 15 },
-                { key: 'dartWidth', label: 'Largura do Corte', min: 1, max: 10 }
-            ]},
-            { id: 'ondulado', name: 'Vaso Orgânico (Ondas)', icon: 'waves', render: renderOndulado, params: [
-                { key: 'd', label: 'Diâmetro da Base', min: 5, max: 30 },
-                { key: 'hMax', label: 'Altura Máxima', min: 5, max: 40 },
-                { key: 'hMin', label: 'Altura Mínima (Vale)', min: 2, max: 35 },
-                { key: 'waves', label: 'Número de Ondas', min: 1, max: 10 }
-            ]},
-            { id: 'caixa', name: 'Caixa Quadrada', icon: 'box', render: renderCaixa, params: [
-                { key: 'w', label: 'Largura', min: 4, max: 40 },
-                { key: 'l', label: 'Profundidade', min: 4, max: 40 },
-                { key: 'h', label: 'Altura', min: 2, max: 30 }
-            ]}
+
+        // --- 3. GESTÃO DE UI E ESTADO ---
+
+        function initUI() {
+            const shapeSel = document.getElementById('shape-selector');
+            Object.keys(shapes).forEach(key => {
+                const s = shapes[key];
+                const checked = key === currentShape ? 'checked' : '';
+                const activeClass = key === currentShape ? 'border-clay-600 bg-clay-50 ring-1 ring-clay-600' : 'border-gray-200 hover:border-clay-400';
+                
+                const label = document.createElement('label');
+                label.className = `cursor-pointer flex items-center p-3 border rounded-lg transition-all ${activeClass}`;
+                label.innerHTML = `
+                    <input type="radio" name="shape" value="${key}" class="hidden" ${checked} onchange="changeShape('${key}')">
+                    <i class="ph ${s.icon} text-2xl mr-3 text-clay-700"></i>
+                    <span class="font-medium text-sm">${s.name}</span>
+                `;
+                shapeSel.appendChild(label);
+            });
+            buildSliders();
+        }
+
+        function changeShape(shapeId) {
+            currentShape = shapeId;
+            // Refazer visual dos botões de seleção
+            const labels = document.querySelectorAll('#shape-selector label');
+            labels.forEach(l => {
+                const radio = l.querySelector('input');
+                if (radio.value === currentShape) {
+                    l.className = `cursor-pointer flex items-center p-3 border rounded-lg transition-all border-clay-600 bg-clay-50 ring-1 ring-clay-600`;
+                } else {
+                    l.className = `cursor-pointer flex items-center p-3 border rounded-lg transition-all border-gray-200 hover:border-clay-400`;
+                }
+            });
+            buildSliders();
+        }
+
+        function buildSliders() {
+            const container = document.getElementById('parameters-container');
+            container.innerHTML = '';
+            
+            const params = shapes[currentShape].params;
+            Object.keys(params).forEach(key => {
+                const p = params[key];
+                const isCm = key !== 'waves' && key !== 'darts'; // Unidades
+                const unit = isCm ? 'cm' : '';
+                
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-semibold text-gray-600">${p.label}</label>
+                        <span class="text-xs font-mono bg-white px-2 py-0.5 rounded border border-gray-200" id="val-${key}">${p.val} ${unit}</span>
+                    </div>
+                    <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.val}" 
+                           class="w-full h-2 bg-clay-200 rounded-lg appearance-none cursor-pointer accent-clay-600"
+                           oninput="updateParam('${key}', this.value)">
+                `;
+                container.appendChild(div);
+            });
+            renderSVG();
+        }
+
+        function updateParam(key, value) {
+            shapes[currentShape].params[key].val = parseFloat(value);
+            const isCm = key !== 'waves' && key !== 'darts';
+            document.getElementById(`val-${key}`).innerText = `${value} ${isCm ? 'cm' : ''}`;
+            renderSVG();
+        }
+
+        // --- 4. RENDERIZAÇÃO E RECOMENDAÇÃO DE PAPEL ---
+
+        const paperSizes = [
+            { name: "1 Folha A4", w: 21, h: 29.7 },
+            { name: "1 Folha A3", w: 29.7, h: 42 },
+            { name: "1 Folha A2", w: 42, h: 59.4 },
+            { name: "1 Folha A1", w: 59.4, h: 84.1 },
+            { name: "1 Folha A0", w: 84.1, h: 118.9 }
         ];
 
-        function toggleHandle() {
-            globalParams.showHandle = !globalParams.showHandle;
-            const toggleEl = document.getElementById('handle-toggle');
-            const paramsEl = document.getElementById('handle-params');
+        function getPaperRecommendation(tw, th) {
+            // Necessitamos de ~1cm de margem extra no SVG total para não cortar bordas na impressão
+            const reqW = tw + 1;
+            const reqH = th + 1;
             
-            toggleEl.checked = globalParams.showHandle;
-            
-            if (globalParams.showHandle) {
-                paramsEl.classList.remove('hidden');
-                buildHandleParamsUI();
-            } else {
-                paramsEl.classList.add('hidden');
-            }
-            
-            updateSVGPreviews();
-        }
-
-        function buildHandleParamsUI() {
-            const container = document.getElementById('handle-params');
-            container.innerHTML = '';
-            
-            const handleDefs = [
-                { key: 'aw', label: 'Largura da Alça', min: 1, max: 10, step: "0.5" },
-                { key: 'al', label: 'Compr. da Alça', min: 4, max: 40, step: "0.5" }
-            ];
-
-            handleDefs.forEach(paramDef => {
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <label class="flex justify-between text-sm font-medium text-stone-700 mb-2">
-                        <span>${paramDef.label}</span>
-                        <span id="val-handle-${paramDef.key}" class="text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">${globalParams[paramDef.key]}</span>
-                    </label>
-                    <input type="range" min="${paramDef.min}" max="${paramDef.max}" step="${paramDef.step}" value="${globalParams[paramDef.key]}" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-orange-600" />
-                `;
-                
-                const inputEl = div.querySelector('input');
-                const valEl = div.querySelector(`#val-handle-${paramDef.key}`);
-                
-                inputEl.addEventListener('input', (e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    globalParams[paramDef.key] = val;
-                    valEl.textContent = val;
-                    updateSVGPreviews();
-                });
-                container.appendChild(div);
-            });
-        }
-
-        function updateSVGPreviews() {
-            const currentShapeDef = shapes.find(s => s.id === activeShape);
-            const currentParams = { ...params[activeShape], ...globalParams };
-
-            const previewData = currentShapeDef.render(currentParams, false);
-            const printData = currentShapeDef.render(currentParams, true);
-
-            document.getElementById('preview-container').innerHTML = previewData.html;
-            document.getElementById('print-container').innerHTML = printData.html;
-            document.getElementById('print-title').textContent = `Molde 1:1 - ${currentShapeDef.name}`;
-
-            const paperRec = getPaperRecommendation(previewData.w, previewData.h);
-            document.getElementById('paper-recommendation').textContent = paperRec;
-            document.getElementById('print-paper-rec').textContent = `Recomendado: ${paperRec}`;
-        }
-
-        function selectShape(id) {
-            activeShape = id;
-            const buttons = document.querySelectorAll('.shape-btn');
-            buttons.forEach(btn => {
-                if (btn.dataset.id === id) {
-                    btn.className = "shape-btn w-full flex items-center p-3 rounded-lg border transition-all text-left border-orange-600 bg-orange-50 text-orange-900 font-bold shadow-sm";
-                } else {
-                    btn.className = "shape-btn w-full flex items-center p-3 rounded-lg border transition-all text-left border-stone-200 hover:border-orange-300 text-stone-600 bg-stone-50";
+            for (let p of paperSizes) {
+                // Testa modo retrato ou paisagem
+                if ((reqW <= p.w && reqH <= p.h) || (reqW <= p.h && reqH <= p.w)) {
+                    return p.name;
                 }
-            });
-            buildParamsUI();
-            updateSVGPreviews();
+            }
+            return "Rolo / Formato Especial";
         }
 
-        function buildShapeSelector() {
-            const container = document.getElementById('shape-selector');
-            container.innerHTML = '';
-            shapes.forEach(shape => {
-                const btn = document.createElement('button');
-                btn.dataset.id = shape.id;
-                btn.className = "shape-btn w-full flex items-center p-3 rounded-lg border transition-all text-left";
-                btn.onclick = () => selectShape(shape.id);
-                btn.innerHTML = `<i data-lucide="${shape.icon}" class="w-5 h-5 mr-3"></i><span class="text-sm">${shape.name}</span>`;
-                container.appendChild(btn);
-            });
-        }
-
-        function buildParamsUI() {
-            const container = document.getElementById('params-container');
-            container.innerHTML = '';
+        function renderSVG() {
+            const shapeObj = shapes[currentShape];
+            // Construir objeto de valores simplificado para as funções matemáticas
+            const pValues = {};
+            Object.keys(shapeObj.params).forEach(k => pValues[k] = shapeObj.params[k].val);
             
-            const shapeDef = shapes.find(s => s.id === activeShape);
-            const pValues = params[activeShape];
+            const result = shapeObj.generator(pValues);
+            const padding = 1; // Espaço de respiro (viewBox)
+            
+            // 1. Atualizar UI de Texto
+            document.getElementById('total-dimensions').innerText = `${result.w.toFixed(1)} cm x ${result.h.toFixed(1)} cm`;
+            document.getElementById('paper-recommendation').innerText = getPaperRecommendation(result.w, result.h);
 
-            shapeDef.params.forEach(paramDef => {
-                const div = document.createElement('div');
-                const isInt = paramDef.key === 'darts' || paramDef.key === 'waves';
-                const step = isInt ? "1" : "0.5";
-                
-                div.innerHTML = `
-                    <label class="flex justify-between text-sm font-medium text-stone-700 mb-2">
-                        <span>${paramDef.label}</span>
-                        <span id="val-${paramDef.key}" class="text-orange-700 font-bold bg-orange-100 px-2 py-0.5 rounded">${pValues[paramDef.key]}</span>
-                    </label>
-                    <input type="range" min="${paramDef.min}" max="${paramDef.max}" step="${step}" value="${pValues[paramDef.key]}" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-orange-600" />
-                `;
-                
-                const inputEl = div.querySelector('input');
-                const valEl = div.querySelector(`#val-${paramDef.key}`);
-                
-                inputEl.addEventListener('input', (e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    params[activeShape][paramDef.key] = val;
-                    valEl.textContent = val;
-                    updateSVGPreviews();
-                });
-                container.appendChild(div);
-            });
+            // 2. SVG Responsivo para Ecrã (Screen Preview)
+            // viewBox com folga para a espessura da linha não cortar
+            const viewBox = `-0.5 -0.5 ${result.w + 1} ${result.h + 1}`;
+            const previewSVG = `
+                <svg viewBox="${viewBox}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                    ${result.svg}
+                </svg>
+            `;
+            document.getElementById('preview-svg-container').innerHTML = previewSVG;
+
+            // 3. SVG Físico para Impressão (Print Engine) 1:1 Scale
+            // Atribuímos larguras exatas em 'cm' nas propriedades CSS e Atributos SVG
+            const printContainer = document.getElementById('print-area');
+            printContainer.style.setProperty('--print-width', `${result.w + 1}cm`);
+            printContainer.style.setProperty('--print-height', `${result.h + 1}cm`);
+
+            const printSVG = `
+                <svg width="${result.w + 1}cm" height="${result.h + 1}cm" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" class="print-svg">
+                    ${result.svg}
+                </svg>
+            `;
+            document.getElementById('print-svg-container').innerHTML = printSVG;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            buildShapeSelector();
-            selectShape(activeShape);
-            lucide.createIcons();
-        });
+        // Iniciar aplicação
+        window.onload = () => {
+            initUI();
+        };
     </script>
 </body>
 </html>
