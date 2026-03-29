@@ -6,12 +6,20 @@
     <title>Cerâmica Pro: Motor de Geometria</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tamanho da página atualizado dinamicamente pelo JS para coincidir com o SVG -->
+    <style id="print-page-style">
+        @media print {
+            @page { size: 21cm 29.7cm; margin: 0; }
+        }
+    </style>
     <style>
         @media print {
-            @page { margin: 0; }
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print\:hidden { display: none !important; }
             .print\:block { display: block !important; }
+            /* Garante que o SVG não seja esticado/reduzido pelo layout */
+            #print-container { width: auto !important; line-height: 0; }
+            #print-container svg { display: block; max-width: none !important; }
         }
     </style>
 </head>
@@ -25,11 +33,17 @@
                 <h1 class="text-3xl font-bold text-orange-900">Cerâmica Pro: Motor de Geometria</h1>
                 <p class="text-stone-600 mt-1">Gere planificações exatas para vasos côncavos, convexos e retos.</p>
             </div>
-            <button onclick="window.print()"
-                class="flex items-center gap-2 bg-orange-700 hover:bg-orange-800 text-white px-6 py-3 rounded-lg font-bold shadow-md transition-all cursor-pointer">
-                <i data-lucide="printer" class="w-5 h-5"></i>
-                Imprimir em 100% (Tamanho Real)
-            </button>
+            <div class="flex flex-col items-end gap-1">
+                <button onclick="window.print()"
+                    class="flex items-center gap-2 bg-orange-700 hover:bg-orange-800 text-white px-6 py-3 rounded-lg font-bold shadow-md transition-all cursor-pointer">
+                    <i data-lucide="printer" class="w-5 h-5"></i>
+                    Imprimir em 100% (Tamanho Real)
+                </button>
+                <p class="text-xs text-stone-500 flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3 h-3 text-orange-500"></i>
+                    No diálogo de impressão: <strong class="text-orange-700 ml-1">Escala = 100%</strong>
+                </p>
+            </div>
         </header>
 
         <div class="flex flex-col lg:flex-row gap-6">
@@ -72,32 +86,38 @@
         </div>
     </div>
 
-    <!-- ÁREA DE IMPRESSÃO -->
-    <div id="print-screen" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-4">
+    <!-- ÁREA DE IMPRESSÃO
+         Página 1: cabeçalho informativo
+         Página 2: molde em escala 1:1 exata (page-break-before: always)
+    -->
+    <div id="print-screen" class="hidden print:block absolute top-0 left-0 bg-white text-black" style="margin:0;padding:0;">
 
-        <div class="mb-4 pb-2 border-b-2 border-black flex justify-between items-end">
-            <div>
-                <h1 id="print-title" class="text-2xl font-bold">Molde 1:1</h1>
-                <p class="text-sm">Desenho técnico para corte em placa de argila.</p>
+        <!-- Página 1: informações e régua de verificação -->
+        <div style="padding:1cm; page-break-after:always;">
+            <div style="border-bottom:2px solid black; padding-bottom:0.5cm; margin-bottom:0.6cm; display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                    <h1 id="print-title" style="font-size:20pt;font-weight:bold;margin:0;">Molde 1:1</h1>
+                    <p style="font-size:9pt;margin:0.2cm 0 0;">Desenho técnico para corte em placa de argila.</p>
+                </div>
+                <div style="text-align:right;font-size:8pt;">
+                    <p id="print-paper-rec" style="font-weight:bold;font-size:10pt;margin:0 0 0.3cm;"></p>
+                    <p style="margin:0;"><strong>CONFIRME antes de imprimir:</strong></p>
+                    <p style="margin:0.1cm 0 0;">No diálogo de impressão, defina <strong>Escala = 100%</strong> (sem ajuste de página).</p>
+                    <p style="margin:0.1cm 0 0;">Sem isso, o molde será reduzido e não ficará em tamanho real.</p>
+                </div>
             </div>
-            <div class="text-right text-xs">
-                <p id="print-paper-rec" class="font-bold text-sm mb-1 text-orange-900"></p>
-                <p><strong>RÉGUA DE VERIFICAÇÃO ABAIXO</strong></p>
-                <p>Meça com uma régua física para garantir a escala 1:1.</p>
-            </div>
-        </div>
-
-        <div class="mb-8 flex flex-col gap-1">
+            <p style="font-size:8pt;font-weight:bold;margin:0 0 0.3cm;">RÉGUA DE VERIFICAÇÃO — meça com régua física para confirmar escala 1:1:</p>
             <div style="width:5cm;height:10px;border:1px solid black;border-bottom:none;position:relative;">
                 <div style="position:absolute;top:10px;left:0;width:1cm;height:5px;border-right:1px solid black;"></div>
                 <div style="position:absolute;top:10px;left:1cm;width:1cm;height:5px;border-right:1px solid black;"></div>
                 <div style="position:absolute;top:10px;left:2cm;width:1cm;height:5px;border-right:1px solid black;"></div>
                 <div style="position:absolute;top:10px;left:3cm;width:1cm;height:5px;border-right:1px solid black;"></div>
             </div>
-            <p class="text-[10px] font-mono m-0">0 | 1 | 2 | 3 | 4 | 5cm</p>
+            <p style="font-size:8pt;font-family:monospace;margin:2px 0 0;">0 | 1 | 2 | 3 | 4 | 5cm</p>
         </div>
 
-        <div id="print-container" class="w-full"></div>
+        <!-- Página 2+: molde em escala exata, sem padding -->
+        <div id="print-container" style="margin:0;padding:0;line-height:0;page-break-before:always;"></div>
 
     </div>
 
@@ -185,20 +205,28 @@
 
             // Folhas pequenas e A4 primeiro
             for (const p of PAPER_SIZES.slice(0, 4)) {
-                if (w <= p.w && h <= p.h) return { label: `1× ${p.name} — retrato`, sheets: 1, ok: true };
-                if (h <= p.w && w <= p.h) return { label: `1× ${p.name} — paisagem`, sheets: 1, ok: true };
+                if (w <= p.w && h <= p.h) return { label: `1× ${p.name} — retrato`,  sheets: 1, ok: true, pageW: w, pageH: h };
+                if (h <= p.w && w <= p.h) return { label: `1× ${p.name} — paisagem`, sheets: 1, ok: true, pageW: w, pageH: h };
             }
             // 2× A4 antes de sugerir impressora de grande formato
             if (w <= a4.h * 2 && h <= a4.w)
-                return { label: '2× A4 lado a lado (paisagem) — una as folhas', sheets: 2, ok: true };
+                return { label: '2× A4 lado a lado (paisagem) — una as folhas', sheets: 2, ok: true, pageW: w, pageH: h };
             if (w <= a4.w && h <= a4.h * 2)
-                return { label: '2× A4 empilhadas (retrato) — una as folhas', sheets: 2, ok: true };
+                return { label: '2× A4 empilhadas (retrato) — una as folhas',   sheets: 2, ok: true, pageW: w, pageH: h };
             // A3 em diante
             for (const p of PAPER_SIZES.slice(4)) {
-                if (w <= p.w && h <= p.h) return { label: `1× ${p.name} — retrato`, sheets: 1, ok: true };
-                if (h <= p.w && w <= p.h) return { label: `1× ${p.name} — paisagem`, sheets: 1, ok: true };
+                if (w <= p.w && h <= p.h) return { label: `1× ${p.name} — retrato`,  sheets: 1, ok: true, pageW: w, pageH: h };
+                if (h <= p.w && w <= p.h) return { label: `1× ${p.name} — paisagem`, sheets: 1, ok: true, pageW: w, pageH: h };
             }
-            return { label: 'Maior que A0 — reduza a escala', sheets: 0, ok: false };
+            return { label: 'Maior que A0 — reduza a escala', sheets: 0, ok: false, pageW: w, pageH: h };
+        }
+
+        // Atualiza @page { size } para coincidir exatamente com o SVG gerado
+        function updatePageStyle(pageW, pageH) {
+            const W = pageW.toFixed(4);
+            const H = pageH.toFixed(4);
+            document.getElementById('print-page-style').textContent =
+                `@media print { @page { size: ${W}cm ${H}cm; margin: 0; } }`;
         }
 
         // ── FUNÇÕES DE DESENHO ───────────────────────────────────────────────────
@@ -396,8 +424,10 @@
         function updatePaperRec() {
             const { w, h } = getContentDimensions();
             const rec = getPaperRecommendation(w, h);
-            const tw = (w + 2*PRINT_MARGIN).toFixed(1);
-            const th = (h + 2*PRINT_MARGIN).toFixed(1);
+            const tw = rec.pageW.toFixed(1);
+            const th = rec.pageH.toFixed(1);
+            // Sincroniza @page size com as dimensões reais do SVG
+            updatePageStyle(rec.pageW, rec.pageH);
 
             const color = rec.ok ? 'green' : 'red';
             const icon = rec.sheets === 2 ? 'copy' : (rec.ok ? 'file' : 'alert-triangle');
