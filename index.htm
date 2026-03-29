@@ -42,28 +42,37 @@
         /* Estilos de Impressão (Print CSS) Cruciais */
         @media print {
             @page {
-                margin: 1cm; /* Margem de segurança */
+                size: A4 portrait;
+                margin: 0; /* Margem controlada pelo CSS da página */
             }
-            body {
+            html, body {
+                height: auto !important;
+                width: auto !important;
+                overflow: visible !important;
+                display: block !important;
                 margin: 0;
                 padding: 0;
                 background-color: white !important;
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             /* Esconder UI */
             .no-print { display: none !important; }
             /* Mostrar apenas área de impressão */
             .print-only { display: block !important; }
 
-            /* Forçar tamanho real 1:1 no SVG */
-            #print-area svg {
-                max-width: none !important;
-                max-height: none !important;
-                width: var(--print-width) !important;
-                height: var(--print-height) !important;
-                overflow: visible !important;
-                display: block;
-                page-break-inside: avoid;
+            .print-page {
+                width: 21cm;
+                height: 29.7cm;
+                padding: 1cm;
+                box-sizing: border-box;
+                page-break-after: always;
+                position: relative;
+                background: white;
+                overflow: hidden;
+            }
+            .print-page:last-child {
+                page-break-after: auto;
             }
         }
     </style>
@@ -145,28 +154,7 @@
 
     <!-- ÁREA DE IMPRESSÃO (Print Engine) -->
     <div id="print-area" class="print-only">
-        <!-- Aviso de Calibração -->
-        <div style="border: 2px solid black; padding: 10px; margin-bottom: 20px; font-family: sans-serif;">
-            <h2 style="margin: 0 0 5px 0; font-size: 16pt;">⚠️ ATENÇÃO - CALIBRAÇÃO DE IMPRESSÃO</h2>
-            <p style="margin: 0; font-size: 12pt;">Defina a Escala da impressora para <strong>100%</strong> ou <strong>Tamanho Real</strong>. NÃO use "Ajustar à Página".</p>
-        </div>
-
-        <!-- Régua Física de Validação -->
-        <div style="margin-bottom: 20px; font-family: sans-serif;">
-            <p style="margin: 0 0 5px 0; font-size: 10pt;">Verifique se a caixa abaixo mede exatamente 5cm na folha impressa:</p>
-            <div style="width: 5cm; height: 1cm; border: 1px solid black; position: relative; box-sizing: border-box;">
-                <div style="position: absolute; left: 1cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
-                <div style="position: absolute; left: 2cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
-                <div style="position: absolute; left: 3cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
-                <div style="position: absolute; left: 4cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
-                <span style="position: absolute; right: 2px; bottom: 2px; font-size: 8pt;">5cm</span>
-            </div>
-        </div>
-
-        <!-- Molde SVG Físico -->
-        <div id="print-svg-container">
-            <!-- SVG com tamanhos físicos será injetado aqui -->
-        </div>
+        <!-- Conteúdo será injetado pelo Motor de Paginação JS -->
     </div>
 
     <!-- CÓDIGO DO MOTOR JAVASCRIPT -->
@@ -249,7 +237,9 @@
             const svg = `
                 <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
                     <rect x="${rectX}" y="0" width="${w}" height="${p.h}" />
+                    <text x="${rectX + w/2}" y="${p.h/2}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Parede</text>
                     <circle cx="${cx}" cy="${cyCirc}" r="${r}" />
+                    <text x="${cx}" y="${cyCirc}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Base Ø${p.d}</text>
                 </g>
             `;
             return { svg, w: totalW, h: totalH };
@@ -268,6 +258,7 @@
                     <line x1="${p.h}" y1="${p.h+p.l}" x2="${p.h+p.w}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
                     <line x1="${p.h}" y1="${p.h}" x2="${p.h}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
                     <line x1="${p.h+p.w}" y1="${p.h}" x2="${p.h+p.w}" y2="${p.h+p.l}" stroke-dasharray="0.3, 0.3" />
+                    <text x="${p.h + p.w/2}" y="${p.h + p.l/2}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Fundo</text>
                 </g>
             `;
             return { svg, w: totalW, h: totalH };
@@ -343,8 +334,10 @@
                 <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
                     <g transform="translate(${offsetX}, 0)">
                         <path d="${pathD}" />
+                        <text x="0" y="${-minY + frustumH/2}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Parede Curva</text>
                     </g>
                     <circle cx="${baseCx}" cy="${baseCy}" r="${baseR}" />
+                    <text x="${baseCx}" y="${baseCy}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Base Ø${baseR*2}</text>
                 </g>
             `;
             return { svg, w: totalW, h: totalH };
@@ -394,6 +387,7 @@
                 <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
                     <path d="${pathD}" />
                     <circle cx="${cx}" cy="${cy}" r="${innerR}" stroke-dasharray="0.3,0.3" />
+                    <text x="${cx}" y="${cy}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Fundo Ø${innerR*2}</text>
                 </g>
             `;
             return { svg, w: p.d, h: p.d };
@@ -428,7 +422,9 @@
             const svg = `
                 <g stroke="black" stroke-width="0.05" fill="none" stroke-linejoin="round" stroke-linecap="round">
                     <path d="${pathD}" />
+                    <text x="${cx}" y="${p.hMax/2}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Parede Orgânica</text>
                     <circle cx="${cx}" cy="${cy}" r="${r}" />
+                    <text x="${cx}" y="${cy}" font-family="sans-serif" font-size="0.8" fill="#999" stroke="none" text-anchor="middle" dominant-baseline="middle">Base Ø${p.d}</text>
                 </g>
             `;
             return { svg, w: totalW, h: totalH };
@@ -550,18 +546,84 @@
             `;
             document.getElementById('preview-svg-container').innerHTML = previewSVG;
 
-            // 3. SVG Físico para Impressão (Print Engine) 1:1 Scale
-            // Atribuímos larguras exatas em 'cm' nas propriedades CSS e Atributos SVG
-            const printContainer = document.getElementById('print-area');
-            printContainer.style.setProperty('--print-width', `${result.w + 1}cm`);
-            printContainer.style.setProperty('--print-height', `${result.h + 1}cm`);
+            // 3. Sistema Profissional de Paginação para Impressão (Poster Print Engine)
+            // Resolve o problema de navegadores cortarem SVGs muito grandes e não paginarem horizontalmente
+            const PAGE_W = 19; // 21cm (A4) - 2cm de margem física
+            const PAGE_H = 27.7; // 29.7cm (A4) - 2cm de margem física
+            
+            const totalW = result.w + 1;
+            const totalH = result.h + 1;
 
-            const printSVG = `
-                <svg width="${result.w + 1}cm" height="${result.h + 1}cm" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" class="print-svg">
-                    ${result.svg}
-                </svg>
+            const cols = Math.ceil(totalW / PAGE_W);
+            const rows = Math.ceil(totalH / PAGE_H);
+            const totalPages = cols * rows;
+
+            // Obter lista de parâmetros como string
+            const paramsListHTML = Object.keys(shapeObj.params)
+                .map(k => `<li>${shapeObj.params[k].label}: <strong>${shapeObj.params[k].val}</strong></li>`)
+                .join('');
+
+            // Página 1: Instruções e Régua
+            let printHTML = `
+                <div class="print-page">
+                    <h1 style="font-size: 22pt; margin-bottom: 5px; font-family: sans-serif;">Molde 1:1 - ${shapeObj.name}</h1>
+                    <p style="font-size: 12pt; color: #555; font-family: sans-serif; margin-top:0;">Desenho técnico para corte em placa de argila.</p>
+                    
+                    <div style="margin-top: 30px; border: 2px solid black; padding: 15px; font-family: sans-serif;">
+                        <h2 style="font-size: 14pt; margin-top: 0; color: #b91c1c;">⚠️ CONFIRME ANTES DE IMPRIMIR</h2>
+                        <ul style="font-size: 12pt; padding-left: 20px; line-height: 1.6;">
+                            <li>Defina a <strong>Escala = 100%</strong> ou <strong>"Tamanho Real"</strong> nas definições de impressão.</li>
+                            <li>NÃO use a opção "Ajustar à Página" nem "Encolher".</li>
+                            <li>Formato alvo: <strong>A4</strong></li>
+                            <li>Total de páginas a colar: <strong>${totalPages} pág.</strong></li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-top: 30px; font-family: sans-serif;">
+                        <p style="font-size: 11pt; margin-bottom: 5px;"><strong>RÉGUA DE VERIFICAÇÃO:</strong> Meça a caixa abaixo no papel impresso. Deve medir exatos 5cm.</p>
+                        <div style="width: 5cm; height: 1cm; border: 1px solid black; position: relative; box-sizing: border-box;">
+                            <div style="position: absolute; left: 1cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                            <div style="position: absolute; left: 2cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                            <div style="position: absolute; left: 3cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                            <div style="position: absolute; left: 4cm; top: 0; height: 100%; border-left: 1px solid black;"></div>
+                            <span style="position: absolute; right: 2px; bottom: 2px; font-size: 8pt;">5cm</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px; font-family: sans-serif;">
+                        <h3 style="font-size: 12pt; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Parâmetros Utilizados:</h3>
+                        <ul style="font-size: 11pt; line-height: 1.6; padding-left: 20px;">
+                            ${paramsListHTML}
+                        </ul>
+                    </div>
+                </div>
             `;
-            document.getElementById('print-svg-container').innerHTML = printSVG;
+
+            // Páginas Seguintes: Grelha do Molde (Poster Tiling)
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // Calcula o recorte matemático do SVG para esta folha específica
+                    const startX = -0.5 + c * PAGE_W;
+                    const startY = -0.5 + r * PAGE_H;
+                    const tileViewBox = `${startX} ${startY} ${PAGE_W} ${PAGE_H}`;
+                    
+                    printHTML += `
+                        <div class="print-page">
+                            <div style="position:absolute; top: 0.5cm; left: 1cm; font-size: 8pt; color: #888; font-family: sans-serif;">
+                                Cerâmica Pro | Pág ${r * cols + c + 1} de ${totalPages} | Col ${c+1}, Linha ${r+1}
+                            </div>
+                            <!-- Área de desenho com tracejado claro para guiar o corte/colagem -->
+                            <div style="position:absolute; top: 1cm; left: 1cm; width: 19cm; height: 27.7cm; border: 1px dashed #e5e7eb; box-sizing: border-box;">
+                                <svg width="19cm" height="27.7cm" viewBox="${tileViewBox}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+                                    ${result.svg}
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            document.getElementById('print-area').innerHTML = printHTML;
         }
 
         // Iniciar aplicação
