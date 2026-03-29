@@ -12,11 +12,12 @@
     </style>
     <style>
         @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; margin: 0; padding: 0; }
             .print\:hidden { display: none !important; }
             .print\:block { display: block !important; }
             #print-container { width: auto !important; line-height: 0; }
-            #print-container svg { display: block; max-width: none !important; overflow: visible !important; }
+            /* Garante que o SVG saia em escala física rígida */
+            #print-container svg { display: block; max-width: none !important; overflow: hidden !important; position: absolute; top: 0; left: 0; }
         }
     </style>
 </head>
@@ -96,8 +97,8 @@
     <!-- ÁREA DE IMPRESSÃO -->
     <div id="print-screen" class="hidden print:block absolute top-0 left-0 bg-white text-black" style="margin:0;padding:0;width:100%;">
 
-        <!-- Página 1: Cabeçalho e Régua -->
-        <div style="padding:1cm; page-break-after:always;">
+        <!-- Página 1: Cabeçalho e Régua (Controlada via JS para não estourar a folha) -->
+        <div id="print-info-page" style="padding:1cm; page-break-after:always; position:relative; box-sizing:border-box; overflow:hidden;">
             <div style="border-bottom:2px solid black; padding-bottom:0.5cm; margin-bottom:0.6cm; display:flex; justify-content:space-between; align-items:flex-end;">
                 <div>
                     <h1 id="print-title" style="font-size:20pt;font-weight:bold;margin:0;">Molde 1:1</h1>
@@ -109,7 +110,7 @@
                     <p style="margin:0.1cm 0 0; color:red; font-weight:bold;">Defina a Escala = 100% ou "Tamanho Real"</p>
                 </div>
             </div>
-            <p style="font-size:8pt;font-weight:bold;margin:0 0 0.3cm;">RÉGUA DE VERIFICAÇÃO — meça para confirmar escala:</p>
+            <p style="font-size:8pt;font-weight:bold;margin:0 0 0.3cm;">RÉGUA DE VERIFICAÇÃO — meça para confirmar escala (1cm real):</p>
             <div style="width:5cm;height:10px;border:1px solid black;border-bottom:none;position:relative;">
                 <div style="position:absolute;top:10px;left:0;width:1cm;height:5px;border-right:1px solid black;"></div>
                 <div style="position:absolute;top:10px;left:1cm;width:1cm;height:5px;border-right:1px solid black;"></div>
@@ -119,13 +120,15 @@
             <p style="font-size:8pt;font-family:monospace;margin:2px 0 0;">0 | 1 | 2 | 3 | 4 | 5cm</p>
         </div>
 
-        <!-- Páginas do Molde -->
+        <!-- Páginas do Molde Dividido -->
         <div id="print-container" style="margin:0;padding:0;line-height:0;page-break-before:always;"></div>
     </div>
 
     <script>
         // --- CONSTANTES E ESTADO GLOBAL ---
-        const PRINT_MARGIN = 0.8; // cm de respiro
+        const PRINT_MARGIN = 0.8; // cm de respiro ao redor da peça
+        const OVERLAP = 1.5;      // cm de SOBREPOSIÇÃO/SANGRIA entre folhas (Garante que a impressora não "coma" a borda)
+        
         const PAPER_SIZES = [
             { name: 'A4', w: 21.0, h: 29.7 },
             { name: 'A3', w: 29.7, h: 42.0 },
@@ -148,20 +151,35 @@
             caixa: { w: 10, l: 10, h: 8 }
         };
 
-        // --- MOTOR DE PAGINAÇÃO E PAPEL ---
+        // --- MOTOR DE PAGINAÇÃO (COM SANGRIA E OVERLAP) ---
         function getEffectivePaper(cW, cH, paperName = selectedPaper) {
             const tW = cW + 2 * PRINT_MARGIN;
             const tH = cH + 2 * PRINT_MARGIN;
-            if (paperName === 'auto') return { paperW: tW, paperH: tH, pages: 1 };
+            
+            if (paperName === 'auto') {
+                for (let p of PAPER_SIZES) {
+                    if ((tW <= p.w && tH <= p.h) || (tW <= p.h && tH <= p.w)) {
+                        return { paperW: tW <= p.w ? p.w : p.h, paperH: tW <= p.w ? p.h : p.w, pages: 1 };
+                    }
+                }
+                paperName = 'A4'; // Fallback
+            }
             
             const p = PAPER_SIZES.find(pp => pp.name === paperName) || PAPER_SIZES[0];
-            if (tW <= p.w && tH <= p.h) return { paperW: p.w, paperH: p.h, pages: 1 }; // Retrato
-            if (tW <= p.h && tH <= p.w) return { paperW: p.h, paperH: p.w, pages: 1 }; // Paisagem
             
-            // Divide na orientação que render menos páginas
-            const pP = Math.ceil(tW / p.w) * Math.ceil(tH / p.h);
-            const pL = Math.ceil(tW / p.h) * Math.ceil(tH / p.w);
-            return (pL < pP) ? { paperW: p.h, paperH: p.w, pages: pL } : { paperW: p.w, paperH: p.h, pages: pP };
+            // Calcula quantas páginas usando o OVERLAP para subtrair a área de colagem
+            const calcPages = (pw, ph) => {
+                const cols = tW <= pw ? 1 : Math.ceil((tW - OVERLAP) / (pw - OVERLAP));
+                const rows = tH <= ph ? 1 : Math.ceil((tH - OVERLAP) / (ph - OVERLAP));
+                return cols * rows;
+            };
+            
+            const pagesP = calcPages(p.w, p.h);
+            const pagesL = calcPages(p.h, p.w);
+            
+            // Retorna a orientação que gasta menos folhas
+            if (pagesL < pagesP) return { paperW: p.h, paperH: p.w, pages: pagesL };
+            return { paperW: p.w, paperH: p.h, pages: pagesP };
         }
 
         function buildPrintPages(inner, cW, cH, strokeClass, paperW, paperH) {
@@ -169,14 +187,16 @@
             const tH = cH + 2 * PRINT_MARGIN;
             const m = PRINT_MARGIN;
             
-            // Conteúdo integral
             const fullContent = `
                 <rect x="${m}" y="${m}" width="${cW}" height="${cH}" stroke="#aaa" stroke-dasharray="0.25 0.15" fill="none" stroke-width="0.035"/>
-                <text x="${tW/2}" y="${m*0.55}" font-size="0.28" fill="#aaa" text-anchor="middle" dominant-baseline="middle" font-family="monospace">margem ${m}cm · ${cW.toFixed(1)}×${cH.toFixed(1)}cm</text>
+                <text x="${tW/2}" y="${m*0.55}" font-size="0.28" fill="#aaa" text-anchor="middle" dominant-baseline="middle" font-family="monospace">margem segurança ${m}cm</text>
                 <g stroke-width="0.05" transform="translate(${m},${m})">${inner}</g>`;
 
-            const cols = Math.ceil(tW / paperW);
-            const rows = Math.ceil(tH / paperH);
+            // Se for maior que 1 folha, aplicamos o "passo" descontando o overlap
+            const stepW = paperW - OVERLAP;
+            const stepH = paperH - OVERLAP;
+            const cols = tW <= paperW ? 1 : Math.ceil((tW - OVERLAP) / stepW);
+            const rows = tH <= paperH ? 1 : Math.ceil((tH - OVERLAP) / stepH);
             const total = cols * rows;
             let html = '';
             let pageNum = 0;
@@ -184,19 +204,36 @@
             for (let row = 0; row < rows; row++) {
                 for (let col = 0; col < cols; col++) {
                     pageNum++;
-                    const vbX = col * paperW;
-                    const vbY = row * paperH;
+                    const vbX = col * stepW;
+                    const vbY = row * stepH;
                     let guides = '';
 
-                    // Linhas de corte para montagem multi-folhas
+                    // DESENHA AS GUIAS DE SOBREPOSIÇÃO E CORTE
                     if (total > 1) {
-                        if (col < cols - 1) guides += `<line x1="${vbX + paperW}" y1="${vbY}" x2="${vbX + paperW}" y2="${vbY+paperH}" stroke="#bbb" stroke-width="0.04" stroke-dasharray="0.2 0.1"/>`;
-                        if (row < rows - 1) guides += `<line x1="${vbX}" y1="${vbY + paperH}" x2="${vbX+paperW}" y2="${vbY + paperH}" stroke="#bbb" stroke-width="0.04" stroke-dasharray="0.2 0.1"/>`;
-                        guides += `<text x="${vbX+paperW-0.3}" y="${vbY+0.4}" font-size="0.3" fill="#bbb" text-anchor="end" font-family="monospace">pág.${pageNum}/${total}</text>`;
+                        // Linha Direita (para colar a próxima coluna)
+                        if (col < cols - 1) {
+                            const lineX = vbX + paperW - OVERLAP;
+                            guides += `
+                                <line x1="${lineX}" y1="${vbY}" x2="${lineX}" y2="${vbY+paperH}" stroke="#ef4444" stroke-width="0.08" stroke-dasharray="0.3 0.2"/>
+                                <rect x="${lineX}" y="${vbY}" width="${OVERLAP}" height="${paperH}" fill="#ef4444" opacity="0.08"/>
+                                <text x="${lineX - 0.2}" y="${vbY + paperH/2}" font-size="0.35" fill="#ef4444" text-anchor="middle" dominant-baseline="bottom" font-family="sans-serif" font-weight="bold" transform="rotate(-90 ${lineX - 0.2} ${vbY + paperH/2})">COLE A PRÓXIMA FOLHA AQUI (SANGRIA)</text>
+                            `;
+                        }
+                        // Linha Inferior (para colar a próxima linha)
+                        if (row < rows - 1) {
+                            const lineY = vbY + paperH - OVERLAP;
+                            guides += `
+                                <line x1="${vbX}" y1="${lineY}" x2="${vbX+paperW}" y2="${lineY}" stroke="#ef4444" stroke-width="0.08" stroke-dasharray="0.3 0.2"/>
+                                <rect x="${vbX}" y="${lineY}" width="${paperW}" height="${OVERLAP}" fill="#ef4444" opacity="0.08"/>
+                                <text x="${vbX + paperW/2}" y="${lineY - 0.2}" font-size="0.35" fill="#ef4444" text-anchor="middle" font-family="sans-serif" font-weight="bold">COLE A FOLHA DE BAIXO AQUI (SANGRIA)</text>
+                            `;
+                        }
+                        guides += `<text x="${vbX+paperW-0.5}" y="${vbY+0.6}" font-size="0.4" fill="#64748b" text-anchor="end" font-family="monospace">Pág. ${pageNum}/${total}</text>`;
                     }
 
+                    // A MÁGICA DE EVITAR PÁGINA EM BRANCO EXTRA: A div wrapper é 0.05cm (meio milímetro) mais baixa que o papel real.
                     const svg = `<svg viewBox="${vbX} ${vbY} ${paperW} ${paperH}" width="${paperW}cm" height="${paperH}cm" class="${strokeClass}" overflow="hidden">${fullContent}${guides}</svg>`;
-                    const style = pageNum === total ? 'margin:0;padding:0;line-height:0;' : 'page-break-after:always;margin:0;padding:0;line-height:0;';
+                    const style = `position:relative; overflow:hidden; width:${paperW}cm; height:${paperH - 0.05}cm; box-sizing:border-box; ${pageNum === total ? '' : 'page-break-after:always;'}`;
                     html += `<div style="${style}">${svg}</div>`;
                 }
             }
@@ -229,7 +266,7 @@
             const combinedInner = innerShapes + handleSvg;
             const strokeClass = isPrint ? 'stroke-black fill-none' : 'stroke-orange-900 fill-[#fff7ed]';
 
-            // Se for captura para paginação, aborta a criação da tag <svg> aqui
+            // Captura para o paginador processar
             if (contentCapture !== null && isPrint) {
                 contentCapture = { inner: combinedInner, cW: totalW, cH: totalH, strokeClass };
                 return '';
@@ -255,8 +292,7 @@
                 const width = Math.PI * p.d;
                 const baseW = Math.max(width, p.d);
                 const baseH = p.h + 1 + p.d;
-                const tf = isPrint ? 'black' : '#7c2d12';
-                const fs = isPrint ? '0.5' : '1';
+                const tf = isPrint ? 'black' : '#7c2d12', fs = isPrint ? '0.5' : '1';
                 const inner = `
                     <rect x="0" y="0" width="${width}" height="${p.h}"/>
                     <circle cx="${p.d/2}" cy="${p.h + 1 + p.d/2}" r="${p.d/2}"/>
@@ -280,15 +316,60 @@
                 const sO = pt(R1, -theta/2), eO = pt(R1, theta/2), sI = pt(R2, -theta/2), eI = pt(R2, theta/2);
                 const path = `M ${sO.x} ${sO.y} A ${R1} ${R1} 0 ${la} 1 ${eO.x} ${eO.y} L ${eI.x} ${eI.y} A ${R2} ${R2} 0 ${la} 0 ${sI.x} ${sI.y} Z`;
                 
-                const baseW = R1 * 2, baseH = R1 + rBot * 2 + 2;
+                // NOVO: Calcula o Bounding Box Exato do Arco para remover margens invisíveis
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for(let i=0; i<=100; i++){
+                    const a = -theta/2 + (i/100)*theta;
+                    const p1 = pt(R1, a), p2 = pt(R2, a);
+                    minX = Math.min(minX, p1.x, p2.x);
+                    maxX = Math.max(maxX, p1.x, p2.x);
+                    minY = Math.min(minY, p1.y, p2.y);
+                    maxY = Math.max(maxY, p1.y, p2.y);
+                }
+                const arcW = maxX - minX;
+                const arcH = maxY - minY;
+                
+                const gap = 1;
+                let totalW = arcW, totalH = arcH;
+                let cBotX, cBotY, cTopX, cTopY;
+                
+                // NOVO: Lógica de empacotamento inteligente (Lado a Lado ou Empilhados)
+                if (arcW >= (rBot*2 + rTop*2 + gap)) {
+                    // Lado a lado (centralizados)
+                    totalW = arcW;
+                    const blockW = rBot*2 + gap + rTop*2;
+                    const startX = (totalW - blockW) / 2;
+                    
+                    cBotY = arcH + gap + rBot;
+                    cTopY = arcH + gap + rTop;
+                    cBotX = startX + rBot;
+                    cTopX = startX + rBot*2 + gap + rTop;
+                    totalH = arcH + gap + Math.max(rBot*2, rTop*2);
+                } else {
+                    // Empilhados (centralizados)
+                    totalW = Math.max(arcW, rBot*2, rTop*2);
+                    cBotX = totalW / 2;
+                    cBotY = arcH + gap + rBot;
+                    cTopX = totalW / 2;
+                    cTopY = cBotY + rBot + gap + rTop;
+                    totalH = cTopY + rTop;
+                }
+                
+                const arcTranslateX = (totalW - arcW) / 2;
                 const tf = isPrint ? 'black' : '#7c2d12', fs = isPrint ? '0.5' : '1';
+                
                 const inner = `
-                    <path d="${path}"/>
-                    <circle cx="${R1}" cy="${R1+rBot+1}" r="${rBot}"/>
-                    <circle cx="${R1}" cy="${R1+rBot*2+rTop+2}" r="${rTop}" stroke-dasharray="0.5"/>
-                    <text x="${R1}" y="${R1-R2-(R1-R2)/2}" font-size="${fs}" stroke="none" fill="${tf}" text-anchor="middle" dominant-baseline="middle">Parede Curva</text>
+                    <g transform="translate(${arcTranslateX - minX}, ${-minY})">
+                        <path d="${path}"/>
+                        <text x="${minX + arcW/2}" y="${minY + arcH/2}" font-size="${fs}" stroke="none" fill="${tf}" text-anchor="middle" dominant-baseline="middle">Parede Curva</text>
+                    </g>
+                    <circle cx="${cBotX}" cy="${cBotY}" r="${rBot}"/>
+                    <text x="${cBotX}" y="${cBotY}" font-size="${fs}" stroke="none" fill="${tf}" text-anchor="middle" dominant-baseline="middle">Base Ø${p.dBot}</text>
+                    
+                    <circle cx="${cTopX}" cy="${cTopY}" r="${rTop}" stroke-dasharray="0.5"/>
+                    <text x="${cTopX}" y="${cTopY}" font-size="${fs}" stroke="none" fill="${tf}" text-anchor="middle" dominant-baseline="middle">Boca Ø${p.dTop}</text>
                 `;
-                return buildSVG(inner, baseW, baseH, isPrint);
+                return buildSVG(inner, totalW, totalH, isPrint);
             }},
 
             { id: 'tigela', name: 'Tigela Bojuda (Pences)', icon: 'orbit', params: [
@@ -408,6 +489,10 @@
             // Define Folha e Paginação
             const ep = getEffectivePaper(cW, cH);
             document.getElementById('print-page-style').textContent = `@media print { @page { size: ${ep.paperW.toFixed(4)}cm ${ep.paperH.toFixed(4)}cm; margin: 0; } }`;
+            
+            // Previne a folha "capa" de quebrar
+            document.getElementById('print-info-page').style.height = `${ep.paperH - 0.05}cm`;
+            
             document.getElementById('print-container').innerHTML = buildPrintPages(inner, cW, cH, strokeClass, ep.paperW, ep.paperH);
             
             // Atualiza Textos
@@ -425,7 +510,7 @@
             document.getElementById('paper-rec-content').innerHTML = `
                 <p class="mb-2 text-blue-900">Configuração atual: <strong>${ep.pages} folha(s) ${selectedPaper === 'auto' ? '(Automático)' : selectedPaper}</strong></p>
                 <div class="flex flex-wrap gap-1">${btns}</div>
-                ${ep.pages > 1 ? `<p class="mt-2 text-xs text-orange-600"><i data-lucide="scissors" class="w-3 h-3 inline"></i> Impressão dividida. Linhas de colagem incluídas.</p>` : ''}
+                ${ep.pages > 1 ? `<p class="mt-2 text-xs text-orange-600 font-bold bg-orange-100 p-2 rounded"><i data-lucide="scissors" class="w-3 h-3 inline"></i> Impressão Dividida: O sistema vai gerar uma área de colagem vermelha de 1.5cm entre as folhas. Não haverá perda de bordas!</p>` : ''}
             `;
             document.getElementById('print-paper-rec').textContent = `Imprimir em: ${selectedPaper==='auto' ? ep.paperW > ep.paperH ? 'Paisagem' : 'Retrato' : selectedPaper} (${ep.pages} pág.)`;
             lucide.createIcons();
